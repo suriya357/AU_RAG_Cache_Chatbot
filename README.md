@@ -1,4 +1,4 @@
-# Anna University IT Department — Agentic RAG Chatbot with Redis Semantic Caching
+# Anna University IT Department — Agentic RAG Chatbot with Redis Semantic Caching and Live web Search
 
 An agentic Retrieval-Augmented Generation (RAG) system that answers questions
 about the Anna University IT department using its own scraped web content,
