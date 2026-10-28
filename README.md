@@ -51,7 +51,7 @@ whether an answer came from the cache.
                      ▼                ▼
         Return cached answer   ┌─────────────────────────────┐
         immediately.           │  Knowledge Base path          │
-        No retrieval, no       │  ChromaDB vector search        │
+        No retrieval, no       │  Hybrid (Vector + BM25) search │
         re-ranking, no LLM     │  → Cross-encoder re-rank          │
         call at all.           │  → Generate answer (Groq)            │
                                 └─────────────┬───────────────────┘
@@ -59,7 +59,7 @@ whether an answer came from the cache.
                                               ▼
                                 ┌─────────────────────────────┐
                                 │  Live Search fallback          │
-                                │  DuckDuckGo → Generate (Groq)    │
+                                │  SerpAPI (Google) → Gen (Groq)  │
                                 └─────────────┬───────────────────┘
                                               │
                                               ▼
@@ -107,7 +107,7 @@ cost lives.
 .
 ├── ingest.py              # Phase 1 — scrapes source pages (14 URLs)
 ├── chunker.py             # Phase 2 — splits text into chunks
-├── vectorstore.py         # Phase 2 — embeddings + ChromaDB
+├── vectorstore.py         # Phase 2 — Hybrid Retrieval (Dense ChromaDB + BM25 + RRF)
 ├── reranker.py            # Phase 3 — cross-encoder re-ranking
 ├── generator.py           # Phase 4 — Groq generation + retry logic
 ├── router.py              # Phase 5 — semantic cache gate + agentic KB/search routing
@@ -122,10 +122,12 @@ cost lives.
 │   ├── conftest.py
 │   ├── test_chunker.py
 │   ├── test_generator.py
+│   ├── test_hybrid_search.py  # Hybrid search, BM25 & RRF tests
 │   ├── test_main.py
 │   ├── test_reranker.py
 │   ├── test_router.py         # includes cache-integration tests
-│   └── test_semantic_cache.py # NEW — cache-specific unit tests
+│   ├── test_semantic_cache.py # cache-specific unit tests
+│   └── test_serpapi_search.py # SerpAPI live search fallback tests
 ├── requirements.txt        # one merged, conflict-resolved dependency list
 ├── .env.example             # documented template — copy to .env
 └── .gitignore

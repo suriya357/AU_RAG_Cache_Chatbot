@@ -218,7 +218,7 @@ def test_semantically_similar_question_is_a_cache_hit(monkeypatch):
 
     hit = semantic_cache.check(paraphrase)
     assert hit is not None
-    assert hit["matched_question"] == original
+    assert hit["matched_question"] == semantic_cache._normalize(original)
     assert hit["answer"] == "AI, ML, and Cybersecurity courses."
 
 

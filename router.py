@@ -42,8 +42,9 @@ Requires:
 
 import argparse
 import logging
+import os
 
-from ddgs import DDGS
+from serpapi import GoogleSearch
 
 import generator
 import semantic_cache
@@ -63,33 +64,52 @@ SEARCH_TIMEOUT = 10  # seconds
 
 def web_search(query: str, max_results: int = SEARCH_RESULT_COUNT) -> list[dict]:
     """
-    Run a live DuckDuckGo search and return results shaped like the chunk
-    dicts generator.py expects, so they can be fed into the same
-    build_context_block() / generate_answer() functions unchanged.
+    Run a live web search via SerpAPI (Google Search engine) and return results
+    shaped like the chunk dicts generator.py expects, so they can be fed into
+    the same build_context_block() / generate_answer() functions unchanged.
     """
-    logger.info(f"Falling back to live web search for: {query!r}")
+    logger.info(f"Falling back to live SerpAPI web search for: {query!r}")
+
+    api_key = os.getenv("SERPAPI_API_KEY")
+    if not api_key or api_key == "your_serpapi_key_here":
+        err_msg = (
+            "SERPAPI_API_KEY not configured. Please add your SerpAPI key to .env "
+            "(get a free key at https://serpapi.com)"
+        )
+        logger.error(err_msg)
+        raise ConfigurationError(err_msg)
 
     try:
-        with DDGS() as ddgs:
-            raw_results = list(ddgs.text(query, max_results=max_results))
+        search = GoogleSearch({
+            "q": query,
+            "api_key": api_key,
+            "num": max_results,
+            "engine": "google",
+        })
+        raw_results = search.get_dict()
+        if "error" in raw_results:
+            raise SearchFallbackError(query, raw_results["error"])
+        organic_results = raw_results.get("organic_results", [])
+    except (ConfigurationError, SearchFallbackError):
+        raise
     except Exception as e:
-        # Don't crash the whole request over a search failure — log it and
-        # let the caller (route_and_answer) handle the empty-results case.
-        logger.error(f"Web search failed: {e}")
+        logger.error(f"SerpAPI web search failed: {e}")
         raise SearchFallbackError(query, str(e)) from e
 
-    # Reshape into the same format as vectorstore/reranker chunks, so
-    # generator.build_context_block() can consume either interchangeably.
     search_chunks = []
-    for r in raw_results:
-        search_chunks.append({
-            "chunk_id": r.get("href", ""),
-            "text": r.get("body", ""),
-            "source_url": r.get("href", ""),
-            "source_title": r.get("title", "Web result"),
-        })
+    for r in organic_results[:max_results]:
+        snippet = r.get("snippet", "")
+        link = r.get("link", "")
+        title = r.get("title", "Web result")
+        if snippet or link:
+            search_chunks.append({
+                "chunk_id": link,
+                "text": snippet or title,
+                "source_url": link,
+                "source_title": title,
+            })
 
-    logger.info(f"Web search returned {len(search_chunks)} results")
+    logger.info(f"SerpAPI web search returned {len(search_chunks)} results")
     return search_chunks
 
 
@@ -148,7 +168,7 @@ def route_and_answer(question: str, retrieve_k: int = 20, rerank_n: int = 5) -> 
 
         try:
             search_chunks = web_search(question)
-        except SearchFallbackError as e:
+        except (SearchFallbackError, ConfigurationError) as e:
             logger.error(f"Search fallback unavailable: {e}")
             search_chunks = []
 

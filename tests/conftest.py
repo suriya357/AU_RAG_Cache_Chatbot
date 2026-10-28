@@ -27,7 +27,7 @@ def stub_external_dependencies(monkeypatch):
         "chromadb": types.ModuleType("chromadb"),
         "chromadb.utils": types.ModuleType("chromadb.utils"),
         "groq": types.ModuleType("groq"),
-        "ddgs": types.ModuleType("ddgs"),
+        "serpapi": types.ModuleType("serpapi"),
         "dotenv": types.ModuleType("dotenv"),
     }
 
@@ -43,17 +43,14 @@ def stub_external_dependencies(monkeypatch):
     )
     fake_modules["dotenv"].load_dotenv = lambda *a, **k: None
 
-    class FakeDDGS:
-        def __enter__(self):
-            return self
+    class FakeGoogleSearch:
+        def __init__(self, params=None):
+            self.params = params or {}
 
-        def __exit__(self, *args):
-            return False
+        def get_dict(self):
+            return {"organic_results": []}
 
-        def text(self, query, max_results=5):
-            return []
-
-    fake_modules["ddgs"].DDGS = FakeDDGS
+    fake_modules["serpapi"].GoogleSearch = FakeGoogleSearch
 
     for name, module in fake_modules.items():
         monkeypatch.setitem(sys.modules, name, module)

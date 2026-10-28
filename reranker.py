@@ -94,16 +94,21 @@ def rerank(query: str, candidates: list[dict], top_n: int = RERANK_TOP_N) -> lis
     return ranked[:top_n]
 
 
-def retrieve_and_rerank(query: str, retrieve_k: int = RETRIEVE_TOP_K, rerank_n: int = RERANK_TOP_N) -> list[dict]:
+def retrieve_and_rerank(
+    query: str,
+    retrieve_k: int = RETRIEVE_TOP_K,
+    rerank_n: int = RERANK_TOP_N,
+    mode: str = "hybrid",
+) -> list[dict]:
     """
-    Full pipeline: vector search -> cross-encoder re-rank.
+    Full pipeline: hybrid search (vector + BM25) -> cross-encoder re-rank.
     This is the function later phases (generator.py, router.py) will call.
     """
-    logger.info(f"Retrieving top {retrieve_k} candidates for: {query!r}")
-    candidates = vectorstore.query(query, top_k=retrieve_k)
+    logger.info(f"Retrieving top {retrieve_k} candidates (mode={mode}) for: {query!r}")
+    candidates = vectorstore.query(query, top_k=retrieve_k, mode=mode)
 
     if not candidates:
-        logger.warning("No candidates returned from vector store")
+        logger.warning("No candidates returned from store")
         return []
 
     logger.info(f"Re-ranking {len(candidates)} candidates -> top {rerank_n}")
@@ -129,13 +134,22 @@ def main():
     parser.add_argument("--query", type=str, required=True, help="Question to test")
     parser.add_argument("--retrieve_k", type=int, default=RETRIEVE_TOP_K)
     parser.add_argument("--rerank_n", type=int, default=RERANK_TOP_N)
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="hybrid",
+        choices=["hybrid", "vector", "bm25"],
+        help="Retrieval mode: hybrid (default), vector, or bm25",
+    )
     args = parser.parse_args()
 
-    results = retrieve_and_rerank(args.query, args.retrieve_k, args.rerank_n)
+    results = retrieve_and_rerank(args.query, args.retrieve_k, args.rerank_n, mode=args.mode)
 
-    print(f"\nTop {len(results)} re-ranked results for: {args.query!r}\n")
+    print(f"\nTop {len(results)} re-ranked results (mode={args.mode}) for: {args.query!r}\n")
     for i, r in enumerate(results, 1):
-        print(f"--- Rank {i} | rerank_score={r['rerank_score']:.4f} | vector_distance={r['distance']:.4f} ---")
+        dist_str = f"{r.get('distance', 1.0):.4f}" if r.get("distance") is not None else "N/A"
+        rrf_str = f" | rrf_score={r['rrf_score']:.5f}" if "rrf_score" in r else ""
+        print(f"--- Rank {i} | rerank_score={r['rerank_score']:.4f} | distance={dist_str}{rrf_str} ---")
         print(f"Source: {r['source_title']} ({r['source_url']})")
         print(f"Text: {r['text'][:200]}...")
         print()

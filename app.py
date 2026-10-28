@@ -17,7 +17,7 @@ import requests
 import streamlit as st
 
 API_BASE = "http://127.0.0.1:8000"
-REQUEST_TIMEOUT = 30  # seconds — generation can take a few seconds
+REQUEST_TIMEOUT = 60 # seconds — generation can take a few seconds
 
 st.set_page_config(
     page_title="Ask the IT Department",
